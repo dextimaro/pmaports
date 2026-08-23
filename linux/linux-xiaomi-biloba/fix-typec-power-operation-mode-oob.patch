@@ -1,0 +1,20 @@
+diff --git a/drivers/usb/typec/typec.c b/drivers/usb/typec/typec.c
+index 36ae2f5..40c185e 100644
+--- a/drivers/usb/typec/typec.c
++++ b/drivers/usb/typec/typec.c
+@@ -1020,8 +1020,14 @@ static ssize_t power_operation_mode_show(struct device *dev,
+                                          char *buf)
+ {
+ 	struct typec_port *port = to_typec_port(dev);
++	unsigned int opmode = port->pwr_opmode;
+ 
+-	return sprintf(buf, "%s\n", typec_pwr_opmodes[port->pwr_opmode]);
++	/* Some downstream TCPC drivers leave an out-of-range mode behind. */
++	if (opmode >= ARRAY_SIZE(typec_pwr_opmodes) ||
++	    !typec_pwr_opmodes[opmode])
++		return sprintf(buf, "unknown\n");
++
++	return sprintf(buf, "%s\n", typec_pwr_opmodes[opmode]);
+ }
+ static DEVICE_ATTR_RO(power_operation_mode);
+ 

@@ -1,0 +1,62 @@
+# Reference: <https://postmarketos.org/vendorkernel>
+# Base defconfig: arch/arm64/configs/biloba_defconfig
+pkgname=linux-xiaomi-biloba
+pkgver=4.14.186
+pkgrel=2
+pkgdesc="Xiaomi Redmi Note 8 (2021) kernel"
+arch="aarch64"
+_carch="arm64"
+_flavor="xiaomi-biloba"
+url="https://github.com/MiCode/Xiaomi_Kernel_OpenSource"
+license="GPL-2.0-only"
+options="!strip !check !tracedeps pmb:cross-native"
+makedepends="bash bc bison devicepkg-dev findutils flex openssl-dev perl xz dtc"
+_commit="831600317054fb8e980f0b527975a6492d4788fa"
+_config="config-$_flavor.$arch"
+source="
+	$pkgname-$_commit.tar.gz::$url/archive/$_commit.tar.gz
+	$_config
+	disable-embedded-touchscreen-fw-upgrade.patch
+	fix-duplicate-mtk-vcodec-mem.patch
+	fix-duplicate-set-selection.patch
+	fix-trusty-vring-null-race.patch
+	fix-typec-power-operation-mode-oob.patch
+	selinux_include_generated_headers.patch
+	use_system_cpio.patch
+	stop-inlining-blk_crypto_flock-and-ksm_flock.patch
+	use_system_dtc.patch
+"
+builddir="$srcdir/Xiaomi_Kernel_OpenSource-$_commit"
+_outdir="out"
+
+prepare() {
+	default_prepare
+	REPLACE_GCCH=0 . downstreamkernel_prepare
+}
+
+build() {
+	unset LDFLAGS
+	make O="$_outdir" ARCH="$_carch" CC="${CC:-gcc}" \
+		KBUILD_BUILD_VERSION="$((pkgrel + 1))-postmarketOS"
+}
+
+package() {
+	downstreamkernel_package "$builddir" "$pkgdir" "$_carch" \
+		"$_flavor" "$_outdir"
+	make dtbs_install O="$_outdir" ARCH="$_carch" \
+		INSTALL_DTBS_PATH="$pkgdir"/boot/dtbs
+}
+
+sha512sums="
+d6cb546b803ae55060759f0b7fad3e10a14a68b4c216173bbc39d8acedbca7c186c48d278efa1fe964dfd93d70d5b6708d65e2d0f5efff1d83783b6c0ff6ad01  linux-xiaomi-biloba-831600317054fb8e980f0b527975a6492d4788fa.tar.gz
+306b8cc6a89442aabbeb14e3bdc965a9a44d6393cbbd26924910c3895716519e7b6bb85a958e7631446074e6e8314d3662f4d991d993a5738391636aa72bf628  config-xiaomi-biloba.aarch64
+9e04596bb5542eff72eeec4bbe412f1dd1acf401a0a12459fc658e20aeb8b4977443155ac4330b88c8ac85f37b1db77fd2c38d5e2dc36e33a070468ecd0966f2  disable-embedded-touchscreen-fw-upgrade.patch
+2381da1f8128a02fe37c83c2a7bbb5634e18496f123089baad816cdd6796080e48fc2e8ab904cc8b135a33c3756ced798ffe0f5e4f0b6e53edb746adb4150772  fix-duplicate-mtk-vcodec-mem.patch
+76088f48be9607c553210f31def131de5e6b39eb8c5c21ac6e09de08f036e3abdf64d432cd8b2ead88e6a3376215264923a692e32871bd0417c6d4a1c4d2f969  fix-duplicate-set-selection.patch
+626fd60f499b1d0f3d20d33fcc65cbbcfe67bf7f92dc984e696be8b28bba18d0aad7dd821d0367bef600a8a3c8a990bb0a4e37121a4778b45537e766fc4bdb79  fix-trusty-vring-null-race.patch
+58336dfca1e52c9f6aa960adf492c448745ac8f12c701f33712ca133151a4596299c912d79153d917a38c93ac971c878d621d70d0faa5336f9731c69c51c29f0  fix-typec-power-operation-mode-oob.patch
+6ab9db01d35f7f5cc2c19ebe5f65a7dc479a1c68de587300cdde9a6c759d34610666c72f0f321cd450cf56c13df3b54a774e0f7ebdbf0f8608fbfd66b49d04e7  selinux_include_generated_headers.patch
+28975f5aac872eab10bdfe2b29a8685b70ddb0d105c6c66a26de88ac912573b430fa20901b65384c9cb99d9740cdff7804cfd95474176f93a5bffbccf8182208  use_system_cpio.patch
+e448a1093c09414be36333fbdb0d4a3bc5b59018d571b702c6607cb32927cf1563bf03aa1f2d502e6040490e0b26198dd8204306ebaad41be810ba2d47a2721c  stop-inlining-blk_crypto_flock-and-ksm_flock.patch
+c9e562403cd572c66def9adea434731b77617f7561f1ce1079e21e8f02e8fd9cc1febd7e52c581e8e4b1c4aca21c5ca8c5813d2006be13051048d681a640ab3d  use_system_dtc.patch
+"

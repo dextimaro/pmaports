@@ -1,0 +1,20 @@
+diff --git a/drivers/misc/mediatek/geniezone/gz-trusty/trusty-virtio.c b/drivers/misc/mediatek/geniezone/gz-trusty/trusty-virtio.c
+index 2cd6dd1..6321b89 100644
+--- a/drivers/misc/mediatek/geniezone/gz-trusty/trusty-virtio.c
++++ b/drivers/misc/mediatek/geniezone/gz-trusty/trusty-virtio.c
+@@ -108,9 +108,13 @@ static void check_all_vqs(struct trusty_ctx *tctx)
+ 	struct trusty_vdev *tvdev;
+ 
+ 	list_for_each_entry(tvdev, &tctx->vdev_list, node) {
+-		for (i = 0; i < tvdev->vring_num; i++) {
++		for (i = 0; i < tvdev->vring_num; i++) {
++			struct virtqueue *vq = READ_ONCE(tvdev->vrings[i].vq);
++
+ 			/* vq->vq.callback(&vq->vq);  trusty_virtio_notify */
+-			vring_interrupt(0, tvdev->vrings[i].vq);
++			/* A Trusty callback can race virtqueue initialization. */
++			if (vq)
++				vring_interrupt(0, vq);
+ 		}
+ 	}
+ }
