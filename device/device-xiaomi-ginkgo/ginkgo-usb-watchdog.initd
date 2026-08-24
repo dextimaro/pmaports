@@ -1,0 +1,13 @@
+#!/sbin/openrc-run
+
+name="Redmi Note 8 USB NCM and SSH watchdog"
+description="Continuously recover the ginkgo USB server management link"
+supervisor="supervise-daemon"
+command="/usr/sbin/ginkgo-usb-watchdog"
+respawn_delay=2
+
+depend() {
+	need localmount
+	after modules
+	use logger
+}

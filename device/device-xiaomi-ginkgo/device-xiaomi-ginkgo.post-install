@@ -1,0 +1,5 @@
+#!/bin/sh
+
+rc-update add ginkgo-usb-watchdog default >/dev/null 2>&1 || true
+rc-update add ginkgo-ethernet-watchdog default >/dev/null 2>&1 || true
+exit 0

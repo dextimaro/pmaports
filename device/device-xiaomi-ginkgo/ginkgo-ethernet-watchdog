@@ -1,0 +1,96 @@
+#!/bin/sh
+
+tag="ginkgo-ethernet-watchdog"
+run_dir="/run/ginkgo-ethernet"
+last_iface=""
+dhcp_wait=0
+
+mkdir -p "$run_dir"
+
+# The successful mainline build ships these as modules. Loading every common
+# USB Ethernet driver makes adapter hotplug independent of its chipset.
+for module in r8152 ax88179_178a asix cdc_ether cdc_ncm lan78xx smsc95xx; do
+	modprobe "$module" 2>/dev/null || true
+done
+
+find_ethernet_interface() {
+	for net_path in /sys/class/net/*; do
+		iface=${net_path##*/}
+		case "$iface" in
+			lo|usb0|wlan*|wwan*|rmnet*) continue ;;
+		esac
+
+		[ -e "$net_path/device/driver" ] || continue
+		driver_path=$(readlink -f "$net_path/device/driver" 2>/dev/null) || continue
+		driver=${driver_path##*/}
+		case "$driver" in
+			r8152|ax88179_178a|asix|cdc_ether|cdc_ncm|lan78xx|smsc95xx)
+				printf '%s\n' "$iface"
+				return 0
+				;;
+		esac
+	done
+	return 1
+}
+
+start_dhcp() {
+	iface=$1
+	pid_file="$run_dir/udhcpc-$iface.pid"
+
+	if [ -s "$pid_file" ]; then
+		pid=$(cat "$pid_file" 2>/dev/null || true)
+		if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+			return 0
+		fi
+		rm -f "$pid_file"
+	fi
+
+	udhcpc -b -q -S -t 5 -T 3 -A 10 \
+		-i "$iface" -p "$pid_file" \
+		-x hostname:ginkgo -F ginkgo >/dev/null 2>&1 || true
+}
+
+logger -t "$tag" "USB Ethernet and SSH watchdog started"
+
+while :; do
+	iface=$(find_ethernet_interface 2>/dev/null || true)
+	if [ -n "$iface" ]; then
+		ip link set "$iface" up 2>/dev/null || true
+
+		if [ "$iface" != "$last_iface" ]; then
+			driver_path=$(readlink -f "/sys/class/net/$iface/device/driver" 2>/dev/null || true)
+			logger -t "$tag" "detected $iface using ${driver_path##*/}"
+			last_iface=$iface
+			dhcp_wait=0
+		fi
+
+		if ! ip addr show dev "$iface" 2>/dev/null | grep -q 'inet '; then
+			start_dhcp "$iface"
+			dhcp_wait=$((dhcp_wait + 1))
+			if [ "$dhcp_wait" -ge 15 ]; then
+				# Keep a direct phone-to-PC cable usable without a DHCP server.
+				# A later DHCP lease may coexist with this fallback address.
+				ip addr add 192.168.77.2/24 dev "$iface" 2>/dev/null || true
+				logger -t "$tag" "DHCP pending; added fallback 192.168.77.2/24"
+			fi
+		fi
+
+		{
+			printf 'interface=%s\n' "$iface"
+			ip addr show dev "$iface" 2>/dev/null | awk '/inet / { print "address=" $2; exit }'
+		} >"$run_dir/status"
+	else
+		if [ -n "$last_iface" ]; then
+			logger -t "$tag" "USB Ethernet interface disappeared"
+			last_iface=""
+			dhcp_wait=0
+		fi
+		printf 'interface=waiting\n' >"$run_dir/status"
+	fi
+
+	if ! rc-service sshd status >/dev/null 2>&1; then
+		rc-service sshd start >/dev/null 2>&1 || true
+	fi
+
+	sleep 2
+done
