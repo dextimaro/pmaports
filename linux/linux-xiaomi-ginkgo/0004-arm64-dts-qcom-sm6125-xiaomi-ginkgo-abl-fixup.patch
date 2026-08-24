@@ -1,0 +1,29 @@
+From: Codex <codex@openai.com>
+Subject: [PATCH] arm64: dts: qcom: sm6125-xiaomi-ginkgo: retain ABL fixups
+
+The ginkgo ABL path used by the tested postmarketOS image expects a zero
+board-id and a wakegic symbol for the stock DTBO overlay. Keep both entries in
+newly generated DTBs.
+
+---
+ arch/arm64/boot/dts/qcom/sm6125-xiaomi-ginkgo-common.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/qcom/sm6125-xiaomi-ginkgo-common.dtsi b/arch/arm64/boot/dts/qcom/sm6125-xiaomi-ginkgo-common.dtsi
+--- a/arch/arm64/boot/dts/qcom/sm6125-xiaomi-ginkgo-common.dtsi
++++ b/arch/arm64/boot/dts/qcom/sm6125-xiaomi-ginkgo-common.dtsi
+@@ -24,6 +24,12 @@
+ 
+ 	qcom,msm-id = <QCOM_ID_SM6125 0x10000>;
+ 
++	qcom,board-id = <0 0>;
++
++	__symbols__ {
++		wakegic = "/soc@0/interrupt-controller@f200000";
++	};
++
+ 	aliases {
+ 		serial0 = &uart4;
+ 	};
+-- 
+2.43.0

@@ -1,0 +1,73 @@
+From: Codex <codex@openai.com>
+Subject: [PATCH] arm64: dts: qcom: sm6125-xiaomi-ginkgo: enable PMI632 USB roles
+
+The handset contains a PMI632 companion PMIC. Describe its Type-C block and
+VBUS boost regulator, then connect the Type-C role switch to the HS-only DWC3
+controller. Without this, forcing DWC3 into host mode creates the xHCI root
+hubs but never supplies VBUS to an attached device.
+
+---
+ arch/arm64/boot/dts/qcom/sm6125-xiaomi-ginkgo-common.dtsi | 41 ++++++++++++++++
+ 1 file changed, 41 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/qcom/sm6125-xiaomi-ginkgo-common.dtsi b/arch/arm64/boot/dts/qcom/sm6125-xiaomi-ginkgo-common.dtsi
+--- a/arch/arm64/boot/dts/qcom/sm6125-xiaomi-ginkgo-common.dtsi
++++ b/arch/arm64/boot/dts/qcom/sm6125-xiaomi-ginkgo-common.dtsi
+@@ -10,6 +10,7 @@
+ #include <dt-bindings/pinctrl/qcom,pmic-gpio.h>
+ #include "sm6125.dtsi"
+ #include "pm6125.dtsi"
++#include "pmi632.dtsi"
+ 
+ /delete-node/ &adsp_pil_mem;
+ /delete-node/ &cont_splash_mem;
+@@ -307,7 +308,47 @@
+ &uart4 {
+ 	status = "okay";
+ };
+ 
++&pmi632_typec {
++	status = "okay";
++
++	connector {
++		compatible = "usb-c-connector";
++
++		power-role = "dual";
++		data-role = "dual";
++		self-powered;
++
++		typec-power-opmode = "default";
++		pd-disable;
++
++		vbus-supply = <&pmi632_vbus>;
++
++		port {
++			pmi632_hs_in: endpoint {
++				remote-endpoint = <&usb3_dwc3_hs>;
++			};
++		};
++	};
++};
++
++&pmi632_vbus {
++	regulator-min-microamp = <500000>;
++	regulator-max-microamp = <1000000>;
++	status = "okay";
++};
++
+ &usb3 {
+ 	status = "okay";
+ };
++
++&usb3_dwc3 {
++	dr_mode = "otg";
++	usb-role-switch;
++
++	port {
++		usb3_dwc3_hs: endpoint {
++			remote-endpoint = <&pmi632_hs_in>;
++		};
++	};
++};
+-- 
+2.43.0
