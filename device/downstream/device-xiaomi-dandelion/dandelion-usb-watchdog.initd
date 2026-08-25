@@ -1,0 +1,13 @@
+#!/sbin/openrc-run
+
+name="Redmi 9A USB RNDIS and SSH watchdog"
+description="Continuously recover the dandelion USB server management link"
+supervisor="supervise-daemon"
+command="/usr/sbin/dandelion-usb-watchdog"
+respawn_delay=2
+
+depend() {
+	need localmount
+	after modules
+	use logger
+}

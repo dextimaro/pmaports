@@ -1,0 +1,6 @@
+#!/bin/sh
+
+rc-update add dandelion-usb-watchdog default >/dev/null 2>&1 || true
+rc-update add sshd default >/dev/null 2>&1 || true
+sed -i 's| /boot ext2 | /boot ext4 |' /etc/fstab 2>/dev/null || true
+exit 0

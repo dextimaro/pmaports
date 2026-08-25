@@ -1,0 +1,56 @@
+# Reference: <https://postmarketos.org/devicepkg>
+pkgname=device-xiaomi-dandelion
+pkgdesc="Xiaomi Redmi 9A"
+pkgver=0.1
+pkgrel=18
+url="https://postmarketos.org"
+license="MIT"
+arch="aarch64"
+options="!check !archcheck"
+depends="
+	doas
+	linux-xiaomi-dandelion
+	mkbootimg
+	openssh-server
+	postmarketos-base
+"
+makedepends="devicepkg-dev"
+install="
+	$pkgname.post-install
+	$pkgname.post-upgrade
+"
+source="
+	deviceinfo
+	dandelion-usb-watchdog
+	dandelion-usb-watchdog.initd
+	dandelion-sshd.conf
+	doas.conf
+	initfs-hook.sh
+"
+
+build() {
+	devicepkg_build $startdir $pkgname
+}
+
+package() {
+	devicepkg_package $startdir $pkgname
+
+	install -Dm755 "$srcdir"/dandelion-usb-watchdog \
+		"$pkgdir"/usr/sbin/dandelion-usb-watchdog
+	install -Dm755 "$srcdir"/dandelion-usb-watchdog.initd \
+		"$pkgdir"/etc/init.d/dandelion-usb-watchdog
+	install -Dm644 "$srcdir"/dandelion-sshd.conf \
+		"$pkgdir"/etc/ssh/sshd_config.d/60-dandelion-usb.conf
+	install -Dm644 "$srcdir"/doas.conf \
+		"$pkgdir"/etc/doas.d/doas.conf
+	chmod 755 "$pkgdir"/etc/doas.d
+}
+
+sha512sums="
+f6e6f27c1357d4679b9ffd8d32b8d7456f3334c999c7acd14c9c869f8a7f09f4252de1ae16c8f4fe295dd39bce4a26f1f54f6746e764d10c4f7eed6397719c8e  deviceinfo
+7507965e1434ac171648f727ce4c0ad97c0f4798818af0cfc9baca108a9416bd94c6dc333805b466b14d291f0810075f998d10a45a04f47f1df95a6f2237c8c8  dandelion-usb-watchdog
+e5a0fe40d55655199d79ea903d8bb09e1b9f459d925a2b27ba9b7678a2425e523943adb7b569814a4c3fd5e9a75d4fd64e33a1219212c1b51741faf982a5ebce  dandelion-usb-watchdog.initd
+728ea96a0088a3cf61019d6b25771dd77fc8b6f1f279d848e468af7883aa8767820bf0e194e462713676053d94ae05876da1ff94ee9605287e969fce48361494  dandelion-sshd.conf
+b4fd75245e6c088f87e4931d13ae718ac38538beb9a5a0325f0bd4c5a6b68f765491d026c2806db1eaf3b12b5f586677a80ab4da66ed06244cfd9ea08248831b  doas.conf
+d8c67d7f5164999a01a32ead313add0dcaaf8b19c9cba867d7009d638520b4310062a8b1c343a499435b7a0916a597665794726edfd0a442eff8a328b0c9f311  initfs-hook.sh
+"

@@ -1,0 +1,176 @@
+#!/bin/sh
+
+. /usr/share/initramfs/init_functions.sh
+. /usr/share/misc/source_deviceinfo
+
+LOG_FILE=/var/log/dandelion-usb-role.log
+IDDIG_COUNT=/sys/module/usb20_host/parameters/iddig_cnt
+VBUS_ON=/sys/module/usb20_host/parameters/vbus_on
+UDHCPC_SCRIPT=/usr/share/udhcpc/default.script
+
+log_event() {
+	message=$*
+	logger -t dandelion-usb-watchdog "$message"
+	mkdir -p "${LOG_FILE%/*}"
+	if [ -f "$LOG_FILE" ] && [ "$(wc -c < "$LOG_FILE")" -gt 262144 ]; then
+		tail -c 131072 "$LOG_FILE" > "$LOG_FILE.tmp"
+		mv "$LOG_FILE.tmp" "$LOG_FILE"
+	fi
+	printf 'uptime=%s %s\n' "$(cut -d. -f1 /proc/uptime)" "$message" >> "$LOG_FILE"
+}
+
+iddig_count() {
+	if [ -r "$IDDIG_COUNT" ]; then
+		cat "$IDDIG_COUNT"
+	else
+		printf 'unknown\n'
+	fi
+}
+
+vbus_on() {
+	if [ -r "$VBUS_ON" ]; then
+		cat "$VBUS_ON"
+	else
+		printf 'unknown\n'
+	fi
+}
+
+usb_child_present() {
+	for usb_device in /sys/bus/usb/devices/*; do
+		# Root hubs and their interface nodes exist in both USB roles. A real
+		# child device has its own idVendor/idProduct attributes.
+		case "${usb_device##*/}" in usb*) continue ;; esac
+		[ -r "$usb_device/idVendor" ] && return 0
+	done
+	return 1
+}
+
+usb_host_role() {
+	count=$(iddig_count)
+	case "$count" in
+		*[!0-9]*|'') ;;
+		*) [ $((count % 2)) -eq 1 ] && return 0 ;;
+	esac
+	usb_child_present
+}
+
+usb_net_iface() {
+	for iface_path in /sys/class/net/*; do
+		iface=${iface_path##*/}
+		[ "$iface" = rndis0 ] && continue
+		device_path=$(readlink -f "$iface_path/device" 2>/dev/null)
+		case "$device_path" in
+			*/usb*/*) printf '%s\n' "$iface"; return 0 ;;
+		esac
+	done
+	return 1
+}
+
+usb_identities() {
+	identities=
+	for usb_device in /sys/bus/usb/devices/[0-9]*-[0-9]*; do
+		[ -r "$usb_device/idVendor" ] || continue
+		vid=$(cat "$usb_device/idVendor")
+		pid=$(cat "$usb_device/idProduct")
+		identities="$identities ${usb_device##*/}=$vid:$pid"
+	done
+	printf '%s\n' "${identities# }"
+}
+
+log_kernel_usb_snapshot() {
+	printf '%s\n' '--- recent kernel USB/OTG messages ---' >> "$LOG_FILE"
+	dmesg | grep -Ei 'usb|musb|iddig|otg|vbus|cdc|ether|rndis' | \
+		tail -80 >> "$LOG_FILE"
+}
+
+start_usb_dhcp() {
+	iface=$1
+	pidfile="/run/udhcpc-$iface.pid"
+	if [ -s "$pidfile" ]; then
+		pid=$(cat "$pidfile")
+		kill -0 "$pid" 2>/dev/null && return 0
+		rm -f "$pidfile"
+	fi
+	ip link set "$iface" up
+	udhcpc -b -i "$iface" -p "$pidfile" -s "$UDHCPC_SCRIPT" \
+		>> "$LOG_FILE" 2>&1 &
+}
+
+log_event "USB role, networking and SSH watchdog started"
+
+# OpenRC replaces the initramfs /dev with an initially sparse tmpfs. Populate
+# all kernel-advertised devices before fixing the few dandelion-specific cases.
+mdev -s
+
+# OpenRC mounts devpts with ptmxmode=000 on this downstream userspace and does
+# not recreate /dev/ptmx. Fix both so sshd can allocate interactive PTYs.
+mkdir -p /dev/pts
+if grep -qs ' /dev/pts ' /proc/mounts; then
+	mount -o remount,gid=5,mode=620,ptmxmode=666 /dev/pts
+else
+	mount -t devpts -o gid=5,mode=620,ptmxmode=666 devpts /dev/pts
+fi
+ln -sfn pts/ptmx /dev/ptmx
+
+# The initramfs creates these nodes before switch_root, but OpenRC's devfs
+# service mounts a fresh /dev afterwards. Recreate the two loop partition
+# nodes so fstab and package maintenance can access pmOS_boot and pmOS_root.
+for loop_partition in loop0p1 loop0p2; do
+	if ! [ -b "/dev/$loop_partition" ]; then
+		set -- $(awk -v wanted="$loop_partition" '$4 == wanted { print $1, $2 }' /proc/partitions)
+		if [ "$#" -eq 2 ]; then
+			mknod "/dev/$loop_partition" b "$1" "$2"
+		fi
+	fi
+done
+
+# The volume is formatted as ext2, while the vendor kernel only enables the
+# compatible ext4 driver. /etc/fstab is normalized by the package scripts.
+if ! grep -qs ' /boot ' /proc/mounts && [ -b /dev/loop0p1 ]; then
+	mount -t ext4 -o nodev,nosuid,noexec /dev/loop0p1 /boot || \
+		logger -t dandelion-usb-watchdog "Failed to mount pmOS_boot"
+fi
+
+previous_state=
+while :; do
+	count=$(iddig_count)
+	if usb_host_role; then
+		role=host
+		iface=$(usb_net_iface || true)
+		if [ -n "$iface" ]; then
+			start_usb_dhcp "$iface"
+		fi
+	else
+		role=device
+		iface=rndis0
+		if ! ip link show rndis0 >/dev/null 2>&1; then
+			set -- /sys/class/udc/*
+			if [ -e "$1" ]; then
+				rm -f /tmp/_setup_usb_network
+				setup_usb_network
+			fi
+		fi
+
+		if ip link show rndis0 >/dev/null 2>&1; then
+			ip link set rndis0 up 2>/dev/null || true
+			if ! ip addr show rndis0 | grep -q "$HOST_IP"; then
+				ifconfig rndis0 "$HOST_IP"
+			fi
+			start_unudhcpd
+		fi
+	fi
+
+	vbus=$(vbus_on)
+	state="$role:$count:$vbus:$iface:$(usb_identities)"
+	if [ "$state" != "$previous_state" ]; then
+		log_event "role=$role iddig_count=$count vbus_on=$vbus net_if=${iface:-none} usb_devices='$(usb_identities)'"
+		log_kernel_usb_snapshot
+		previous_state=$state
+	fi
+
+	if ! rc-service sshd status >/dev/null 2>&1; then
+		rc-service sshd start
+	fi
+
+	sleep 2
+done
