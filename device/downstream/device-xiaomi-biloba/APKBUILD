@@ -1,0 +1,65 @@
+# Reference: <https://postmarketos.org/devicepkg>
+pkgname=device-xiaomi-biloba
+pkgdesc="Xiaomi Redmi Note 8 (2021)"
+pkgver=1
+pkgrel=5
+url="https://postmarketos.org"
+license="MIT"
+arch="aarch64"
+options="!check !archcheck !strip"
+depends="
+	linux-xiaomi-biloba
+	mkbootimg
+	postmarketos-base
+"
+makedepends="devicepkg-dev"
+install="
+	$pkgname.post-install
+	$pkgname.post-upgrade
+"
+source="
+	deviceinfo
+	kernel-cmdline.conf
+	initfs-hook.sh
+	biloba-usb-watchdog
+	biloba-usb-watchdog.initd
+	biloba-usb-watchdog.start
+	biloba-pty.initd
+	usbnet-stockcrc.ko
+	cdc_ether-stockcrc.ko
+"
+
+build() {
+	devicepkg_build $startdir $pkgname
+}
+
+package() {
+	devicepkg_package $startdir $pkgname
+	install -Dm755 "$srcdir"/biloba-usb-watchdog \
+		"$pkgdir"/usr/sbin/biloba-usb-watchdog
+	install -Dm755 "$srcdir"/biloba-usb-watchdog.initd \
+		"$pkgdir"/etc/init.d/biloba-usb-watchdog
+	install -Dm755 "$srcdir"/biloba-usb-watchdog.start \
+		"$pkgdir"/etc/local.d/biloba-usb-watchdog.start
+	install -Dm755 "$srcdir"/biloba-pty.initd \
+		"$pkgdir"/etc/init.d/biloba-pty
+	# Xiaomi's published source does not reproduce the ABI CRCs of the stock
+	# kernel.  These two modules retain the stock 4.14.186 kernel and contain
+	# CRCs extracted from that kernel's own __kcrctab.
+	install -Dm644 "$srcdir"/usbnet-stockcrc.ko \
+		"$pkgdir"/usr/lib/biloba-kernel-modules/usbnet.ko
+	install -Dm644 "$srcdir"/cdc_ether-stockcrc.ko \
+		"$pkgdir"/usr/lib/biloba-kernel-modules/cdc_ether.ko
+}
+
+sha512sums="
+246e2d16982ea868c2a2a05c9a64b36e95fd533872ca84169675ed41856665c4e8ae924ebca7f938f08c4ba4448648ac19d3862031e9ff4d0b9c025f2ed51810  deviceinfo
+1ae2faae247af9a9ad842f236f07150eb3ab7f7c6218171eee768d8a88dbc078f733e8f135b1c7972fc6c8b684abfed1a3365593e98c41df8262a79ec6e91452  kernel-cmdline.conf
+9f1ba6d8c86a7540d37731cceb15aa2676e3b5c483a82d99b040b58454ccf64dc6e266cec36c3b90ec858bbae9805c455cb1f6441d6b8f2b497b15bf2f8d2bae  initfs-hook.sh
+7ac1d19c77155f93f1e02cf5374b2622f37e1ca6bdb95ec851b1fa925933cfda4a2a40210abed665253e8e58645e0e3a2d36098c3c269ba25f67e9fbe29ae7dd  biloba-usb-watchdog
+605c4b65a6406cd485fc5df8f0de4f73813a9ff090c120aadd31ee6e468ee2c0783cfdf02284c5f37a361d3a3813d4f0cd541eaeadc75c2a12bc1b3f1c6ebb31  biloba-usb-watchdog.initd
+f5ce301a391af6ef00a1b37b44927e10710ed197c70d5f9410178e52ea2164cef250ae7be349c61a9e9c6e45e6a4a07aaf2c18272f1066c89f6b9fb521f22cb3  biloba-usb-watchdog.start
+74516c36916e87a51d0986b4b9572ac078d022a4c71a1438f30f65a6088e133a5880ad93f3109be7c69ba034643163e3de966ab4231dc4a8b1e0966b47746bf1  biloba-pty.initd
+d9317a68865030be6e99df3e8273ec0f963cc7aad37e6c02cd375e3cac001157b746767508943dbf8be874df5975bd5d06312eec78adb029d2138b91f040ee05  usbnet-stockcrc.ko
+ceb861eb7529b94230dd04b25a98720f04cde418ae51e8ba95b5af080d26ef28570c456aeef68f06f0238b6e27753ff05d45bc4c27910fb774640a1046e38c24  cdc_ether-stockcrc.ko
+"

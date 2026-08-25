@@ -1,0 +1,8 @@
+#!/bin/sh
+
+# The local service is already part of postmarketOS' persistent default
+# runlevel.  Start the device watchdog from here instead of relying on an
+# extra /etc/runlevels symlink, which this early port drops across reboots.
+if ! rc-service biloba-usb-watchdog status >/dev/null 2>&1; then
+	rc-service biloba-usb-watchdog start
+fi

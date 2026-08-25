@@ -1,0 +1,25 @@
+#!/sbin/openrc-run
+
+description="Set up Unix98 PTYs for the biloba vendor kernel"
+
+depend() {
+	need devfs
+	before sshd
+}
+
+start() {
+	ebegin "Configuring /dev/pts and /dev/ptmx"
+	mkdir -p /dev/pts || return 1
+	if awk '$5 == "/dev/pts" { found = 1 } END { exit !found }' \
+		/proc/self/mountinfo; then
+		mount -o remount,gid=5,mode=620,ptmxmode=666 /dev/pts || \
+			return 1
+	else
+		mount -n -t devpts \
+			-o noexec,nosuid,gid=5,mode=620,ptmxmode=666 \
+			devpts /dev/pts || return 1
+	fi
+	rm -f /dev/ptmx || return 1
+	ln -s pts/ptmx /dev/ptmx || return 1
+	eend 0
+}
