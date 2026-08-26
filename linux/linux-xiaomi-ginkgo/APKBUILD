@@ -14,7 +14,6 @@ options="
 	pmb:generic-kernel
 	pmb:kconfigcheck-community
 	pmb:kconfigcheck-immutable
-	pmb:kconfigcheck-lockdown
 	pmb:kconfigcheck-rust
 	pmb:kconfigcheck-selinux
 	pmb:kconfigcheck-uefi
@@ -87,5 +86,5 @@ sha512sums="
 e5f2e05f645fa57fceef79dc5be42a1d7a15969ac5dcefd3453a3145454fc96e4ec05920e807bc2cc61fa94d17fa60291d65052707292290a526e5d288079045  linux-xiaomi-ginkgo-7.2_rc4.tar.gz
 79ac02eb2704b1df9f69fcc2255f66d14999ff43efb93cdfe6ce22c9fdbbdfa4f20b2bca3772af0aec071e79561f68b5b2421e983070a7c9baf71e019d683b40  0003-arm64-dts-qcom-sm6125-xiaomi-ginkgo-enable-pmi632-usb.patch
 5050a8e52b18043fccc8ec5ef4357d86fc6a14a7a688c3a8b0cb99e28efffe21b29eeedc9ade7541faaf01a3b359b90cd66615b48b1835126b2b3f8d2ab26d19  0004-arm64-dts-qcom-sm6125-xiaomi-ginkgo-abl-fixup.patch
-0d9e3cd3d7b3becb2030648078041ed0be5f810cdfcff28bfd89102b00433a3cb6d8eb7057489177e9567ccfd9e1c09504eb1939ea939fecf0fae3bcd8be228b  config-mainline.aarch64
+f58d17e8d3b6e2ded6918db4e4d225c85a1e920a6f37b9c60645c1bd9693e7b542f7854e7a0176204d7df6161c153e12ac1458a857361048562e9c403e4ffc32  config-mainline.aarch64
 "
