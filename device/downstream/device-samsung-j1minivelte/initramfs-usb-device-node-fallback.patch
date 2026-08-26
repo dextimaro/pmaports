@@ -1,0 +1,11 @@
+--- a/usr/share/initramfs/init_2nd.sh
++++ b/usr/share/initramfs/init_2nd.sh
+@@ -23,2 +23,8 @@
+ setup_usb_network
++
++# The legacy ACM gadget is registered after the initial mdev scan. Ensure its
++# character device exists before the rootfs getty is started.
++if ! [ -c /dev/ttyGS0 ]; then
++	mdev -s
++fi
+ start_unudhcpd

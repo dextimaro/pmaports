@@ -1,0 +1,36 @@
+# Reference: <https://postmarketos.org/deviceinfo>
+# Please use double quotes only. You can source this file in shell scripts.
+
+deviceinfo_format_version="0"
+deviceinfo_name="Samsung Galaxy J1 Mini Prime SM-J106F"
+deviceinfo_manufacturer="Samsung"
+deviceinfo_codename="samsung-j1minivelte"
+deviceinfo_year="2016"
+deviceinfo_arch="armv7"
+
+# Device related
+deviceinfo_chassis="handset"
+deviceinfo_external_storage="true"
+deviceinfo_screen_width="480"
+deviceinfo_screen_height="800"
+
+# Diagnostic composite USB gadget. PID a4a3 intentionally avoids the legacy
+# signed NDIS 5.1 package for 0525:a4a2 on Windows 11; CDC ACM can bind to the
+# built-in usbser.sys driver while RNDIS remains available for Linux hosts.
+# Do not use 18d1:d001: Google's Android INF claims it as an ADB interface.
+deviceinfo_usb_idVendor="0x0525"
+deviceinfo_usb_idProduct="0xA4A3"
+
+# Bootloader related; verify against the physical phone before flashing
+deviceinfo_flash_method="heimdall-bootimg"
+deviceinfo_generate_bootimg="true"
+deviceinfo_bootimg_qcdt="true"
+deviceinfo_bootimg_append_seandroidenforce="true"
+deviceinfo_flash_offset_base="0x00000000"
+deviceinfo_flash_offset_kernel="0x00008000"
+deviceinfo_flash_offset_ramdisk="0x01000000"
+deviceinfo_flash_offset_second="0x00f00000"
+deviceinfo_flash_offset_tags="0x00000100"
+deviceinfo_flash_pagesize="2048"
+deviceinfo_flash_sparse="true"
+deviceinfo_flash_sparse_samsung_format="1"

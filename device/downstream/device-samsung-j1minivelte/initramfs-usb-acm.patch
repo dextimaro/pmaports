@@ -1,0 +1,8 @@
+--- a/usr/share/initramfs/init_functions.sh
++++ b/usr/share/initramfs/init_functions.sh
+@@ -798 +798,5 @@
+-	echo "rndis" >"$sysfs_dir/functions"
++	# Keep the network function, but also expose a standards-based serial
++	# console. Windows 11 cannot use the old signed NDIS 5.1 RNDIS package.
++	echo "acm,rndis" >"$sysfs_dir/functions" || \
++		echo "acm" >"$sysfs_dir/functions"

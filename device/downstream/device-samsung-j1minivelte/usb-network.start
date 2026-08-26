@@ -1,0 +1,24 @@
+#!/bin/sh
+
+# Windows does not match its signed RNDIS driver to the composite A4A3
+# interface. Switch to the signed driver's standalone 0525:A4A2 hardware ID.
+sysfs=/sys/class/android_usb/android0
+if [ -d "$sysfs" ]; then
+	echo 0 >"$sysfs/enable"
+	sleep 1
+	echo 0525 >"$sysfs/idVendor"
+	echo a4a2 >"$sysfs/idProduct"
+	echo rndis >"$sysfs/functions"
+	echo 1 >"$sysfs/enable"
+fi
+
+# Enforce the server address after switch_root in case OpenRC reset it.
+for _ in $(seq 1 20); do
+	if [ -d /sys/class/net/rndis0 ]; then
+		ifconfig rndis0 172.16.42.1 netmask 255.255.255.0 up
+		exit 0
+	fi
+	sleep 1
+done
+
+exit 1

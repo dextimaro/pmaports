@@ -1,0 +1,9 @@
+--- a/usr/share/initramfs/init.sh
++++ b/usr/share/initramfs/init.sh
+@@ -54,3 +54,3 @@
+-start_unudhcpd
+-# J106 read-only mass-storage diagnostic snapshot.
+-/j106-mass-storage-diag.sh &
++# J106 early read-only mass-storage diagnostic snapshot v2.
++/j106-mass-storage-diag.sh &
++start_unudhcpd

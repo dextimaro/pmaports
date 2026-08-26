@@ -1,0 +1,27 @@
+# Local downstream kernel package rebuilt from the recorded j1minivelte source.
+maintainer=""
+pkgname=linux-samsung-j1minivelte
+pkgver=3.10.65
+pkgrel=1
+pkgdesc="Downstream kernel with dual-role USB Ethernet for Samsung SM-J106F"
+arch="armv7"
+_flavor="samsung-j1minivelte"
+url="https://github.com/lasania32198/android_kernel_samsung_j1minivelte"
+license="GPL-2.0-only"
+options="!strip !check !tracedeps !archcheck"
+source="
+	kernel
+	dt.img
+"
+
+package() {
+	install -Dm644 "$srcdir/kernel" "$pkgdir/boot/vmlinuz"
+	install -Dm644 "$srcdir/dt.img" "$pkgdir/boot/dt.img"
+	mkdir -p "$pkgdir/usr/share/kernel/$_flavor"
+	printf '%s\n' "$pkgver-$_flavor" > "$pkgdir/usr/share/kernel/$_flavor/kernel.release"
+}
+
+sha512sums="
+2871f52085917d1ca2a6f96696601efc2b41043e8d5a7ea5f32d5f414419d83b14e563c514fbcd6a23f21273e2822ebbd96d8d5eaa6f448619ef6da8fcf4b16b  kernel
+1a73acf63cfe2139192363657d11b60843f903c713d89cde100655e36cb78b4938eaae5058de764d9fb1182b7e158ba898e5a99cba5f34b2d8c1d1c27a6cdb8b  dt.img
+"

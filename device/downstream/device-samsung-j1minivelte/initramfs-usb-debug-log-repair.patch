@@ -1,0 +1,5 @@
+--- a/usr/share/initramfs/init.sh
++++ b/usr/share/initramfs/init.sh
+@@ -71,0 +72,2 @@
++) &
++

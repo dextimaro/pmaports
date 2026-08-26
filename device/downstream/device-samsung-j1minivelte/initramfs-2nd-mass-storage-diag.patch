@@ -1,0 +1,5 @@
+--- a/usr/share/initramfs/init_2nd.sh
++++ b/usr/share/initramfs/init_2nd.sh
+@@ -22,0 +23,2 @@
++# J106 second-stage read-only mass-storage diagnostic snapshot.
++/j106-mass-storage-diag.sh &

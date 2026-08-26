@@ -1,0 +1,14 @@
+#!/sbin/openrc-run
+
+name="SM-J106F dynamic USB network"
+description="Switch between USB-host Ethernet/DHCP and RNDIS fallback"
+command="/usr/local/sbin/j106-usb-network"
+command_background="yes"
+pidfile="/run/j106-usb-network.pid"
+output_log="/var/log/j106-usb-network.log"
+error_log="/var/log/j106-usb-network.log"
+
+depend() {
+	need localmount
+	after bootmisc modules mdev sshd
+}

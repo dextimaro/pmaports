@@ -1,0 +1,5 @@
+--- a/usr/share/initramfs/init.sh
++++ b/usr/share/initramfs/init.sh
+@@ -53,0 +54,2 @@
++# J106 early read-only mass-storage diagnostic snapshot v2.
++/j106-mass-storage-diag.sh &

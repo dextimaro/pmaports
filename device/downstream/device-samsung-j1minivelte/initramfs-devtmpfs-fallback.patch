@@ -1,0 +1,27 @@
+--- a/usr/share/initramfs/init_functions.sh
++++ b/usr/share/initramfs/init_functions.sh
+@@ -270,7 +270,12 @@ mount_proc_sys_dev() {
+ 	# mdev
+ 	mount -t proc -o nodev,noexec,nosuid proc /proc || echo "Couldn't mount /proc"
+ 	mount -t sysfs -o nodev,noexec,nosuid sysfs /sys || echo "Couldn't mount /sys"
+-	mount -t devtmpfs -o mode=0755,nosuid dev /dev || echo "Couldn't mount /dev"
++	# J106: the stock Android 3.10 kernel has no usable devtmpfs. Keep /dev
++	# as a real mount so generated nodes survive switch_root.
++	if ! mount -t devtmpfs -o mode=0755,nosuid dev /dev; then
++		echo "Couldn't mount devtmpfs; using tmpfs for /dev"
++		mount -t tmpfs -o mode=0755,nosuid dev /dev || echo "Couldn't mount tmpfs on /dev"
++	fi
+ 	mount -t tmpfs -o nosuid,nodev,mode=0755 run /run || echo "Couldn't mount /run"
+ 
+ 	modprobe libcomposite 2>/dev/null || true
+--- a/usr/share/initramfs/init_2nd.sh
++++ b/usr/share/initramfs/init_2nd.sh
+@@ -21,1 +21,8 @@
+ setup_udev
++
++# J106: eudev does not populate block nodes with the legacy Android kernel
++# when devtmpfs is unavailable. Populate the mounted /dev tmpfs explicitly.
++if ! [ -b /dev/mmcblk0 ]; then
++	echo "Populating missing device nodes with mdev"
++	mdev -s
++fi

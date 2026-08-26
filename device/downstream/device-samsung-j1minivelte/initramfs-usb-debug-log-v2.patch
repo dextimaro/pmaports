@@ -1,0 +1,27 @@
+--- a/usr/share/initramfs/init.sh
++++ b/usr/share/initramfs/init.sh
+@@ -55,8 +55,16 @@
+-# Read-only early diagnostics for devices whose rootfs does not reach OpenRC.
+-# Opening ttyGS0 for output also activates the legacy Android ACM endpoint.
+-(
+-	while [ ! -c /dev/ttyGS0 ]; do
+-		sleep 1
+-	done
+-	exec >/dev/ttyGS0 2>&1
+-	echo "__J106_INITRAMFS_DIAGNOSTICS__"
++# J106 diagnostic logger v2: read-only output before rootfs reaches OpenRC.
++# Opening ttyGS0 for output also activates the legacy Android ACM endpoint.
++(
++	port=""
++	while [ -z "$port" ]; do
++		mdev -s
++		for candidate in /dev/ttyGS*; do
++			if [ -c "$candidate" ]; then
++				port="$candidate"
++				break
++			fi
++		done
++		[ -n "$port" ] || sleep 1
++	done
++	exec >"$port" 2>&1
++	echo "__J106_INITRAMFS_DIAGNOSTICS__"
