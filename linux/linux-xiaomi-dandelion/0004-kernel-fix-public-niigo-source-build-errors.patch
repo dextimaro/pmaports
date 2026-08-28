@@ -1,0 +1,45 @@
+From 7481d977b6ea1ac09ccd997b934b4ec618e53770 Mon Sep 17 00:00:00 2001
+From: admin <user@Linux.myguest.virtualbox.org>
+Date: Tue, 25 Aug 2026 15:29:30 +0300
+Subject: [PATCH 4/7] kernel: fix public niigo source build errors
+
+---
+ include/linux/cpumask.h | 4 +++-
+ kernel/module.c         | 6 ++++--
+ 2 files changed, 7 insertions(+), 3 deletions(-)
+
+diff --git a/include/linux/cpumask.h b/include/linux/cpumask.h
+index 0591173fe..8dc2da807 100644
+--- a/include/linux/cpumask.h
++++ b/include/linux/cpumask.h
+@@ -484,8 +484,10 @@ static inline int cpumask_test_and_clear_cpu(int cpu, struct cpumask *cpumask)
+ static inline void cpumask_setall(struct cpumask *dstp)
+ {
+ 	/* bitmap_fill() isn't optimized for compile-time constants */
+-#if NR_CPUS <= BITS_PER_LONG
++#if NR_CPUS < BITS_PER_LONG
+ 	*cpumask_bits(dstp) = BIT(NR_CPUS) - 1;
++#elif NR_CPUS == BITS_PER_LONG
++	*cpumask_bits(dstp) = ~0UL;
+ #else
+ 	bitmap_fill(cpumask_bits(dstp), nr_cpumask_bits);
+ #endif
+diff --git a/kernel/module.c b/kernel/module.c
+index 20926271c..379e48661 100644
+--- a/kernel/module.c
++++ b/kernel/module.c
+@@ -4531,10 +4531,12 @@ int save_modules(char *mbuf, int mbufsize)
+ 		init_addr = (unsigned long)mod->init_layout.base;
+ 		search_nm = 2;
+ 		for (i = 0; i < mod->sect_attrs->nsections; i++) {
+-			if (!strcmp(mod->sect_attrs->attrs[i].name, ".text")) {
++			if (!strcmp(mod->sect_attrs->attrs[i].battr.attr.name,
++				    ".text")) {
+ 				text_addr = mod->sect_attrs->attrs[i].address;
+ 				search_nm--;
+-			} else if (!strcmp(mod->sect_attrs->attrs[i].name,
++			} else if (!strcmp(
++					   mod->sect_attrs->attrs[i].battr.attr.name,
+ 					   ".init.text")) {
+ 				init_addr = mod->sect_attrs->attrs[i].address;
+ 				search_nm--;

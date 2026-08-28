@@ -1,0 +1,22 @@
+From 998a5ae28f37bfec720105b45359211db2c9db4c Mon Sep 17 00:00:00 2001
+From: admin <user@Linux.myguest.virtualbox.org>
+Date: Tue, 25 Aug 2026 15:48:24 +0300
+Subject: [PATCH 6/7] gps: keep disabled connsys log path consistent
+
+---
+ drivers/misc/mediatek/connectivity/gps/fw_log_gps.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/misc/mediatek/connectivity/gps/fw_log_gps.c b/drivers/misc/mediatek/connectivity/gps/fw_log_gps.c
+index a58d7bdd7..c6ad1c379 100644
+--- a/drivers/misc/mediatek/connectivity/gps/fw_log_gps.c
++++ b/drivers/misc/mediatek/connectivity/gps/fw_log_gps.c
+@@ -239,7 +239,7 @@ static void gps_fw_log_exit(void)
+ 	}
+ 
+ 	pr_info("Unregistering chardev\n");
+-	connsys_log_deinit(CONNLOG_TYPE_GPS);
++	/* Dedicated connsys logging is disabled throughout this public file. */
+ 	cdev_del(&logdevobj->chdev);
+ 	unregister_chrdev_region(logdevobj->devno, 1);
+ 	device_destroy(logdevobj->cls, logdevobj->devno);

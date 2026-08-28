@@ -1,0 +1,21 @@
+From e0c1fe76d506d236437ef0c4c44d9796d188ae62 Mon Sep 17 00:00:00 2001
+From: admin <user@Linux.myguest.virtualbox.org>
+Date: Tue, 25 Aug 2026 15:51:08 +0300
+Subject: [PATCH 7/7] soc: mediatek: include sched_clock declaration
+
+---
+ drivers/soc/mediatek/devapc/mt6765/devapc.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/soc/mediatek/devapc/mt6765/devapc.c b/drivers/soc/mediatek/devapc/mt6765/devapc.c
+index 7f1d995a6..3e9f8a01c 100644
+--- a/drivers/soc/mediatek/devapc/mt6765/devapc.c
++++ b/drivers/soc/mediatek/devapc/mt6765/devapc.c
+@@ -14,6 +14,7 @@
+ #include <linux/spinlock.h>
+ #include <linux/irq.h>
+ #include <linux/sched.h>
++#include <linux/sched/clock.h>
+ #include <linux/cdev.h>
+ #include <linux/init.h>
+ #include <linux/fs.h>

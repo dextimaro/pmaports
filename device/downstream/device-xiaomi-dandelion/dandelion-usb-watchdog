@@ -46,7 +46,7 @@ usb_child_present() {
 }
 
 usb_host_role() {
-	count=$(iddig_count)
+	count="${1:-$(iddig_count)}"
 	case "$count" in
 		*[!0-9]*|'') ;;
 		*) [ $((count % 2)) -eq 1 ] && return 0 ;;
@@ -96,6 +96,26 @@ start_usb_dhcp() {
 		>> "$LOG_FILE" 2>&1 &
 }
 
+ensure_device_network() {
+	if ! ip link show rndis0 >/dev/null 2>&1; then
+		set -- /sys/class/udc/*
+		if [ -e "$1" ]; then
+			rm -f /tmp/_setup_usb_network
+			setup_usb_network
+		fi
+	fi
+
+	if ip link show rndis0 >/dev/null 2>&1; then
+		ip link set rndis0 up 2>/dev/null || true
+		if ! ip addr show rndis0 | grep -q "$HOST_IP"; then
+			ifconfig rndis0 "$HOST_IP"
+		fi
+		start_unudhcpd
+		return 0
+	fi
+	return 1
+}
+
 log_event "USB role, networking and SSH watchdog started"
 
 # OpenRC replaces the initramfs /dev with an initially sparse tmpfs. Populate
@@ -132,45 +152,60 @@ if ! grep -qs ' /boot ' /proc/mounts && [ -b /dev/loop0p1 ]; then
 fi
 
 previous_state=
+health_ticks=0
 while :; do
 	count=$(iddig_count)
-	if usb_host_role; then
+	if usb_host_role "$count"; then
 		role=host
 		iface=$(usb_net_iface || true)
-		if [ -n "$iface" ]; then
-			start_usb_dhcp "$iface"
-		fi
 	else
 		role=device
-		iface=rndis0
-		if ! ip link show rndis0 >/dev/null 2>&1; then
-			set -- /sys/class/udc/*
-			if [ -e "$1" ]; then
-				rm -f /tmp/_setup_usb_network
-				setup_usb_network
-			fi
-		fi
-
 		if ip link show rndis0 >/dev/null 2>&1; then
-			ip link set rndis0 up 2>/dev/null || true
-			if ! ip addr show rndis0 | grep -q "$HOST_IP"; then
-				ifconfig rndis0 "$HOST_IP"
+			iface=rndis0
+		else
+			iface=none
+			ensure_device_network || true
+			if ip link show rndis0 >/dev/null 2>&1; then
+				iface=rndis0
 			fi
-			start_unudhcpd
 		fi
 	fi
 
 	vbus=$(vbus_on)
-	state="$role:$count:$vbus:$iface:$(usb_identities)"
+	identities=$(usb_identities)
+	state="$role:$count:$vbus:$iface:$identities"
 	if [ "$state" != "$previous_state" ]; then
-		log_event "role=$role iddig_count=$count vbus_on=$vbus net_if=${iface:-none} usb_devices='$(usb_identities)'"
+		if [ "$role" = host ]; then
+			[ -n "$iface" ] && start_usb_dhcp "$iface"
+		else
+			ensure_device_network || true
+		fi
+		log_event "role=$role iddig_count=$count vbus_on=$vbus net_if=${iface:-none} usb_devices='$identities'"
 		log_kernel_usb_snapshot
 		previous_state=$state
 	fi
 
-	if ! rc-service sshd status >/dev/null 2>&1; then
-		rc-service sshd start
+	# Periodic recovery remains infinite, but avoid spawning a large process
+	# tree every two seconds on the vendor kernel.  A 30-second health interval
+	# is sufficient for a headless server and prevents PID/task-stack churn.
+	health_ticks=$((health_ticks + 1))
+	if [ "$health_ticks" -ge 6 ]; then
+		if [ "$role" = host ]; then
+			[ -n "$iface" ] && start_usb_dhcp "$iface"
+		else
+			ensure_device_network || true
+		fi
+		if ! [ -s /run/sshd.pid ] || ! kill -0 "$(cat /run/sshd.pid 2>/dev/null)" 2>/dev/null; then
+			# OpenRC may still mark a crashed daemon as started.  A plain start
+			# then becomes a no-op, so force a restart and repair stale state if
+			# the runscript cannot restart it directly.
+			rc-service sshd restart || {
+				rc-service sshd zap || true
+				rc-service sshd start
+			}
+		fi
+		health_ticks=0
 	fi
 
-	sleep 2
+	sleep 5
 done

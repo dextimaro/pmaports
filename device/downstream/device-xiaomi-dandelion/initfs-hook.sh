@@ -1,5 +1,65 @@
 #!/bin/sh
 
+# The downstream kernel enables the MediaTek hardware watchdog less than one
+# second after boot.  Start feeding it before USB setup, eMMC discovery, nested
+# GPT probing or ext4 journal replay: any of those may legitimately take most
+# of the roughly 31 second hardware timeout.
+start_dandelion_watchdog() {
+	if [ -s /run/dandelion-watchdog.pid ]; then
+		watchdog_pid="$(cat /run/dandelion-watchdog.pid)"
+		if kill -0 "$watchdog_pid" 2>/dev/null; then
+			echo "Dandelion watchdog keepalive already running as PID $watchdog_pid"
+			return 0
+		fi
+	fi
+
+	watchdog_device=""
+	for _ in $(seq 1 50); do
+		for candidate in /dev/watchdog /dev/watchdog0; do
+			if [ -c "$candidate" ]; then
+				watchdog_device="$candidate"
+				break 2
+			fi
+		done
+
+		# Some downstream boots expose the watchdog in sysfs without creating
+		# its devtmpfs node.  Recreate watchdog0 from the kernel-provided major
+		# and minor numbers, just as this hook does for userdata below.
+		if [ -r /sys/class/watchdog/watchdog0/dev ]; then
+			old_ifs="$IFS"
+			IFS=:
+			read -r watchdog_major watchdog_minor \
+				< /sys/class/watchdog/watchdog0/dev
+			IFS="$old_ifs"
+			if [ -n "$watchdog_major" ] && [ -n "$watchdog_minor" ]; then
+				mknod /dev/watchdog0 c "$watchdog_major" "$watchdog_minor" 2>/dev/null || true
+			fi
+		fi
+		sleep 0.1
+	done
+
+	if [ -z "$watchdog_device" ] && [ -c /dev/watchdog0 ]; then
+		watchdog_device=/dev/watchdog0
+	fi
+
+	if [ -n "$watchdog_device" ]; then
+		echo "Starting early dandelion watchdog keepalive on $watchdog_device"
+		busybox watchdog -F -t 2 -T 30 "$watchdog_device" &
+		watchdog_pid=$!
+		echo "$watchdog_pid" >/run/dandelion-watchdog.pid
+		sleep 0.1
+		if ! kill -0 "$watchdog_pid" 2>/dev/null; then
+			echo "WARNING: dandelion watchdog keepalive exited immediately"
+			return 1
+		fi
+	else
+		echo "WARNING: no dandelion watchdog device appeared within 5 seconds"
+		return 1
+	fi
+}
+
+start_dandelion_watchdog
+
 # Keep a non-interactive diagnostics channel available during bring-up.  The
 # downstream USB ACM getty enumerates but cannot transmit data to the host.
 cat > /run/dandelion-log-server <<-'EOF'
@@ -25,6 +85,35 @@ chmod +x /run/dandelion-log-server
 	done
 ) &
 echo $! >/run/dandelion-log-server.pid
+
+# RNDIS is created asynchronously on this downstream gadget driver.  The
+# generic start_unudhcpd() call can run while the configfs ifname exists but
+# before the netdev itself does; in that case Windows enumerates RNDIS, while
+# the phone has no 172.16.42.1 address and cannot answer ARP.  Wait for the
+# actual interface and make the initramfs network state explicit.
+usb_iface=""
+for _ in $(seq 1 100); do
+	for candidate in rndis0 usb0 eth0; do
+		if ip link show "$candidate" >/dev/null 2>&1; then
+			usb_iface="$candidate"
+			break 2
+		fi
+	done
+	sleep 0.1
+done
+
+if [ -n "$usb_iface" ]; then
+	usb_server_ip="${HOST_IP:-172.16.42.1}"
+	usb_client_ip="${unudhcpd_client_ip:-172.16.42.2}"
+	ifconfig "$usb_iface" "$usb_server_ip" netmask 255.255.255.0 up
+	if ! pidof unudhcpd >/dev/null 2>&1; then
+		echo "Starting recovered initramfs USB network on $usb_iface ($usb_server_ip)"
+		unudhcpd -i "$usb_iface" -s "$usb_server_ip" -c "$usb_client_ip" &
+	fi
+	ifconfig "$usb_iface" || true
+else
+	echo "WARNING: no dandelion USB network interface appeared within 10 seconds"
+fi
 
 # The generic mount_subpartitions() probe does not reliably recognize the GPT
 # nested in dandelion's Android userdata partition.  This hook runs in stage 2,
@@ -151,26 +240,6 @@ if ! blkid --match-token LABEL=pmOS_root >/dev/null 2>&1; then
 	else
 		echo "WARNING: dandelion userdata block device did not appear"
 	fi
-fi
-
-# The downstream MediaTek kernel leaves the hardware watchdog running while
-# initramfs is starting.  Feed it before doing anything that may wait for
-# hardware or partitions; otherwise dandelion resets roughly 18 seconds after
-# leaving the bootloader.
-watchdog_device=""
-for candidate in /dev/watchdog /dev/watchdog0; do
-	if [ -c "$candidate" ]; then
-		watchdog_device="$candidate"
-		break
-	fi
-done
-
-if [ -n "$watchdog_device" ]; then
-	echo "Starting dandelion watchdog keepalive on $watchdog_device"
-	busybox watchdog -F -t 1 -T 15 "$watchdog_device" &
-	echo $! >/run/dandelion-watchdog.pid
-else
-	echo "WARNING: no dandelion watchdog device found in initramfs"
 fi
 
 if ip link show rndis0 >/dev/null 2>&1 || ip link show usb0 >/dev/null 2>&1; then

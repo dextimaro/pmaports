@@ -1,0 +1,25 @@
+From 6b0af879dae03a85b476958123b6c1d5fb49332f Mon Sep 17 00:00:00 2001
+From: admin <user@Linux.myguest.virtualbox.org>
+Date: Tue, 25 Aug 2026 15:38:24 +0300
+Subject: [PATCH 5/7] mrdump: provide missing public-tree watchdog stub
+
+---
+ drivers/misc/mediatek/aee/mrdump/mrdump_helper.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/drivers/misc/mediatek/aee/mrdump/mrdump_helper.c b/drivers/misc/mediatek/aee/mrdump/mrdump_helper.c
+index 276d87653..d80aacb20 100644
+--- a/drivers/misc/mediatek/aee/mrdump/mrdump_helper.c
++++ b/drivers/misc/mediatek/aee/mrdump/mrdump_helper.c
+@@ -732,6 +732,11 @@ void aee__flush_dcache_area(void *addr, size_t len)
+ 	__flush_dcache_area(addr, len);
+ }
+ 
++/* The public Niigo snapshot lacks the vendor watchdog helper. */
++void __weak aee_wdt_zap_locks(void)
++{
++}
++
+ void aee_zap_locks(void)
+ {
+ 	aee_wdt_zap_locks();

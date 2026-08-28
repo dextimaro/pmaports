@@ -1,0 +1,22 @@
+From 271215acb5cb0b97a61a9f29b06c090f3c5b597b Mon Sep 17 00:00:00 2001
+From: admin <user@Linux.myguest.virtualbox.org>
+Date: Tue, 25 Aug 2026 15:11:01 +0300
+Subject: [PATCH 2/7] power: allow SGM41513 safe module testing
+
+---
+ drivers/power/supply/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/power/supply/Kconfig b/drivers/power/supply/Kconfig
+index e5bdd5b64..0e520c36c 100644
+--- a/drivers/power/supply/Kconfig
++++ b/drivers/power/supply/Kconfig
+@@ -818,7 +818,7 @@ config CHARGER_BQ2560X
+ 	  the config MTK_CHARGER.
+ 
+ config CHARGER_SGM41513
+-	bool "CHARGER_SGM41513"
++	tristate "CHARGER_SGM41513"
+ 	depends on MTK_CHARGER
+ 	help
+ 	  Say Yes to enable

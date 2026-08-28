@@ -1,0 +1,125 @@
+# Reference: <https://postmarketos.org/vendorkernel>
+# r23 stability candidate for Xiaomi Redmi 9A (dandelion, M2007C3LG).
+pkgname=linux-xiaomi-dandelion
+pkgver=4.19.248
+pkgrel=1
+pkgdesc="Xiaomi Redmi 9A Niigo downstream kernel"
+arch="aarch64"
+_carch="arm64"
+_flavor="xiaomi-dandelion"
+url="https://github.com/TelegramAt25/niigo_kernel_xiaomi_blossom"
+license="GPL-2.0-only"
+options="!strip !check !tracedeps pmb:cross-native"
+makedepends="
+	bash
+	bc
+	bison
+	devicepkg-dev
+	findutils
+	flex
+	gcompat
+	linux-headers
+	openssl-dev
+	perl
+	python3
+	tzdata
+"
+
+_commit="31abca52e78ab59011e4e1711a7995ff1f34a178"
+_clang_commit="252aba16f513a857bc923172f67b0e55e23de35f"
+_config="config-$_flavor.$arch"
+_config_sha256="09ee900979a22e5192e2f974d83f0b34f964dbad1ba381841fe86f5deac084bb"
+_outdir="out"
+_toolchain="$srcdir"
+
+source="
+	$pkgname-$_commit.tar.gz::$url/archive/$_commit.tar.gz
+	clang-r383902b.tar.gz::https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/$_clang_commit/clang-r383902b.tar.gz
+	$_config
+	dandelion-twrp.dtb
+	0001-power-supply-add-SGM41513-charger-support.patch
+	0002-power-allow-SGM41513-safe-module-testing.patch
+	0003-power-sgm41513-allow-operation-without-IRQ-GPIO.patch
+	0004-kernel-fix-public-niigo-source-build-errors.patch
+	0005-mrdump-provide-missing-public-tree-watchdog-stub.patch
+	0006-gps-keep-disabled-connsys-log-path-consistent.patch
+	0007-soc-mediatek-include-sched_clock-declaration.patch
+	0008-ikconfig-embed-active-build-config.patch
+"
+builddir="$srcdir/niigo_kernel_xiaomi_blossom-$_commit"
+
+_kernel_make() {
+	TZ=Europe/Moscow PATH="$_toolchain/bin:$PATH" make -C "$builddir" \
+		O="$_outdir" \
+		ARCH="$_carch" \
+		CC="$_toolchain/bin/clang" \
+		LD="$_toolchain/bin/ld.lld" \
+		AR="$_toolchain/bin/llvm-ar" \
+		NM="$_toolchain/bin/llvm-nm" \
+		OBJCOPY="$_toolchain/bin/llvm-objcopy" \
+		OBJDUMP="$_toolchain/bin/llvm-objdump" \
+		STRIP="$_toolchain/bin/llvm-strip" \
+		HOSTCC=gcc \
+		HOSTCXX=g++ \
+		CLANG_TRIPLE=aarch64-linux-gnu- \
+		CROSS_COMPILE="${CROSS_COMPILE:-aarch64-alpine-linux-musl-}" \
+		KCFLAGS="-Wno-error=unused-variable" \
+		KBUILD_BUILD_USER=postmarketos \
+		KBUILD_BUILD_HOST=dandelion \
+	KBUILD_BUILD_VERSION=5 \
+		KBUILD_BUILD_TIMESTAMP="@1787665295" \
+		"$@"
+}
+
+prepare() {
+	default_prepare
+	mkdir -p "$builddir/$_outdir"
+	cp "$srcdir/$_config" "$builddir/$_outdir/.config"
+	_kernel_make olddefconfig
+	actual_config_sha256="$(sha256sum "$builddir/$_outdir/.config" | cut -d' ' -f1)"
+	if [ "$actual_config_sha256" != "$_config_sha256" ]; then
+		echo "r23 config changed after olddefconfig: $actual_config_sha256" >&2
+		return 1
+	fi
+
+	# Refuse to silently build r17, r18 or the failed SR9700 experiment (r20).
+	grep -qx 'CONFIG_USB_NET_DM9601=y' "$builddir/$_outdir/.config"
+	grep -qx '# CONFIG_USB_NET_SR9700 is not set' "$builddir/$_outdir/.config"
+	grep -qx 'CONFIG_CHARGER_SGM41513=y' "$builddir/$_outdir/.config"
+	grep -qx '# CONFIG_CPU_FREQ_TIMES is not set' "$builddir/$_outdir/.config"
+	grep -qx '# CONFIG_VMAP_STACK is not set' "$builddir/$_outdir/.config"
+	grep -qx '# CONFIG_FOCALTECH_FINGERPRINT is not set' \
+		"$builddir/$_outdir/.config"
+}
+
+build() {
+	unset LDFLAGS
+	_kernel_make Image.gz
+}
+
+package() {
+	KERNEL_IMAGE_NAME=Image.gz downstreamkernel_package \
+		"$builddir" "$pkgdir" "$_carch" "$_flavor" "$_outdir"
+
+	# r19 was tested with the DTB extracted from the stable dandelion TWRP.
+	# The public Niigo tree does not emit a matching standalone dandelion DTB.
+	install -Dm644 "$srcdir/dandelion-twrp.dtb" \
+		"$pkgdir/boot/dtbs/mediatek/dandelion.dtb"
+	install -Dm644 "$builddir/$_outdir/.config" \
+		"$pkgdir/usr/share/kernel/$_flavor/config"
+}
+
+sha512sums="
+b781f8f47bfd26cc96cc8323e98d2c8eb94fc99a5ddd2ff32a36a206b25d3fb6c54cee7d9c0b0bca3ef381a33aecc40bc778ea7fd382f5a0378d3cb34a3f09f5  linux-xiaomi-dandelion-31abca52e78ab59011e4e1711a7995ff1f34a178.tar.gz
+1ffec3f2b3a804095a56474da676f701e3eee80182e3b72aa2c4c9034ccd7f1f7e77f15f5f373273cab8552cc64acee33e187521d3423e52f187cc616540e312  clang-r383902b.tar.gz
+561f362e778d0a641254856ef77d8832c86832ceb310b36138c69806211c0d5d9cebfaacf7efc7ad80b134059bfdd671939e2b97d56eab3a2741603cdb8c58cc  config-xiaomi-dandelion.aarch64
+1c0753f72ecf9a991916ce8c2efae3909ca550177f44cd5d4a69d28d7125abf6c611670e02ad2878bcaf79db27b9e2765990fcf82c1dff7922cb0c0e5e48537f  dandelion-twrp.dtb
+ab584a6bd2ca54cf15482887cbb262ca11bd1df9a1635b76475ef49e4b51e12a2a4a7de46324b80a9025d8154019eafe8a178f63dd333b34ed08e610fc1e271a  0001-power-supply-add-SGM41513-charger-support.patch
+8c594b9f7ef702f57397b9e46b3acbac3757716af5b8841f2b40cbf9cc6e30ee86b929b1c47553a03a4366891895a35e42dde70290f854f5dd9e9ffdd755c046  0002-power-allow-SGM41513-safe-module-testing.patch
+b3e4e913577af8b43afc1d4d5a3fe835fae9608e7cb5e11cdc77ec3188ff079c741ebfec95a62a41862a60873f79d68e0ab6e316482a67ad0e3638e46e6cd5ca  0003-power-sgm41513-allow-operation-without-IRQ-GPIO.patch
+b7087b04b38a6a0b33a524a8093dca112596547c0ccd7f738bc50d192943e047160857e7347a9530f14d6ec4bf1e5788bc93708a5dbe85bf5902c1f508a604e4  0004-kernel-fix-public-niigo-source-build-errors.patch
+1f4bb76e4e2ff21d9340c9431343d5a5c527dc79414ccbb7142e865fd67a7fb53f19c37f89b9a87cec689bb4f44a1f57fb9a4e1e7293134964ca78d211068add  0005-mrdump-provide-missing-public-tree-watchdog-stub.patch
+0e1ed53592948b3e0446c37b1e7e722be7a29ec947721a5740ccbf459d9bbc7a32ca89b5bde588e0341361f1ce8e9c245d0b97b41ec0f97e71432ccd19e338ac  0006-gps-keep-disabled-connsys-log-path-consistent.patch
+db2c336c335251784fa25248b33ecbea80564dcf33c196e0198c319b62522927cfade3ea9db2453d20fa4e6c98499a235e97333c51814f8a1ee957d9a432f0a0  0007-soc-mediatek-include-sched_clock-declaration.patch
+4891fd00ed90764c7c3c39b0dd37667c25495019962207281447bfd3cde8c74ba973ff1665c486568b6fa22e3ab2762f639647992e249fb537ccbfc2338d0cba  0008-ikconfig-embed-active-build-config.patch
+"

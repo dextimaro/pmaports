@@ -1,0 +1,56 @@
+From c351b0b542e68afb0fd08a471113011883188420 Mon Sep 17 00:00:00 2001
+From: admin <user@Linux.myguest.virtualbox.org>
+Date: Tue, 25 Aug 2026 15:20:50 +0300
+Subject: [PATCH 3/7] power: sgm41513: allow operation without IRQ GPIO
+
+---
+ .../supply/mediatek/charger/sgm41513_charger.c    | 15 +++++++++++----
+ 1 file changed, 11 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/power/supply/mediatek/charger/sgm41513_charger.c b/drivers/power/supply/mediatek/charger/sgm41513_charger.c
+index 384b87fdb..058e06d5e 100644
+--- a/drivers/power/supply/mediatek/charger/sgm41513_charger.c
++++ b/drivers/power/supply/mediatek/charger/sgm41513_charger.c
+@@ -84,7 +84,7 @@ struct sgm41513 {
+     int psy_usb_type;
+ 
+     int status;
+-    u32 intr_gpio;
++    int intr_gpio;
+     int irq;
+ 
+     struct mutex i2c_rw_lock;
+@@ -609,6 +609,7 @@ static struct sgm41513_platform_data *sgm41513_parse_dt(struct device_node *np,
+ 
+     ret = of_get_named_gpio(np, "sgm,intr_gpio", 0);
+     if (ret < 0) {
++        sgm->intr_gpio = ret;
+         pr_err("%s no sgm,intr_gpio(%d)\n", __func__, ret);
+     } else {
+         sgm->intr_gpio = ret;
+@@ -999,16 +1000,22 @@ static int sgm41513_register_interrupt(struct sgm41513 *sgm)
+ {
+     int ret = 0;
+ 
++    if (!gpio_is_valid(sgm->intr_gpio)) {
++        dev_info(sgm->dev,
++             "no valid interrupt GPIO; continuing without IRQ\n");
++        return 0;
++    }
++
+     ret = devm_gpio_request_one(sgm->dev, sgm->intr_gpio, GPIOF_DIR_IN,
+             "sgm41511_intr_gpio");
+     if (ret < 0) {
+         dev_info(sgm->dev, "request gpio fail\n");
+         return ret;
+-    } else {
+-        sgm->client->irq = gpio_to_irq(sgm->intr_gpio);
+     }
+ 
+-    if (! sgm->client->irq) {
++    sgm->irq = gpio_to_irq(sgm->intr_gpio);
++    sgm->client->irq = sgm->irq;
++    if (sgm->irq <= 0) {
+         pr_info("sgm->client->irq is NULL\n");//remember to config dws
+         return -ENODEV;
+     }

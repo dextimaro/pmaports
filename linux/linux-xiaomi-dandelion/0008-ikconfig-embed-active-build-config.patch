@@ -1,0 +1,30 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: postmarketOS <postmarketos@dandelion>
+Date: Fri, 28 Aug 2026 15:05:00 +0300
+Subject: [PATCH] kernel: embed the active build configuration
+
+The vendor tree generates /proc/config.gz from stock_defconfig even when the
+kernel is built with an O= output directory and a custom .config.  This makes
+runtime diagnostics report options that were not used for compilation.
+
+Follow the upstream IKCONFIG rule and use KCONFIG_CONFIG, which points at the
+active output-tree .config.
+---
+ kernel/Makefile | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/kernel/Makefile b/kernel/Makefile
+index 1111111..2222222 100644
+--- a/kernel/Makefile
++++ b/kernel/Makefile
+@@ -125,7 +125,7 @@ obj-$(CONFIG_RSEQ) += rseq.o
+ $(obj)/configs.o: $(obj)/config_data.h
+ 
+ targets += config_data.gz
+-$(obj)/config_data.gz: arch/arm64/configs/stock_defconfig FORCE
++$(obj)/config_data.gz: $(KCONFIG_CONFIG) FORCE
+ 	$(call if_changed,gzip)
+ 
+       filechk_ikconfiggz = (echo "static const char kernel_config_data[] __used = MAGIC_START"; cat $< | scripts/bin2c; echo "MAGIC_END;")
+-- 
+2.43.0
